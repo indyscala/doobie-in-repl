@@ -1,0 +1,18 @@
+import doobie._
+import doobie.imports._
+import scalaz.concurrent.Task
+
+val xa = DriverManagerTransactor[Task](
+  "oracle.jdbc.OracleDriver",
+  "jdbc:oracle:thin:@//172.55.0.104:1521/indyscaladb",
+  "indyscala",
+  "secret"
+)
+
+println("""
+Example:
+
+  val query = sql"select current_timestamp from dual".query[java.sql.Timestamp].unique
+  val task = query.transact(xa)
+  task.run
+""")

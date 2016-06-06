@@ -9,3 +9,7 @@ libraryDependencies ++= Seq(
   "org.tpolecat" %% "doobie-core" % "0.2.3",
   "com.lihaoyi" %% "ammonite-repl" % "0.5.8" cross CrossVersion.full
 )
+
+initialCommands in console := """
+  ammonite.repl.Main.run(predefFile = Some(ammonite.ops.cwd/"init_doobie.txt"))
+"""
