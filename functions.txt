@@ -1,0 +1,84 @@
+import java.util.Date
+import scalaz.NonEmptyList
+
+// case classes modeling table structures
+
+case class Person(
+  id: Long,
+  first: String,
+  last: String,
+  dob: Option[Date])
+
+case class Event(
+  id: Long,
+  personId: Long,
+  name: Option[String],
+  city: Option[String],
+  stateCode: Option[String],
+  countryCode: Option[String],
+  hasExpense: Option[Boolean])
+
+// money values are represented by a pair of columns in `expense` table
+case class Money(
+  amount: Int,
+  currency: Option[String])
+
+case class Expense(
+  id: Long,
+  eventId: Long,
+  payorName: Option[String],
+  amount: Option[Money])
+
+
+// utility methods to help us explore our data
+
+/**
+ * Find a list of people limited to a subset of first names.
+ * Also demonstrate `IN` clauses.
+ */
+def findPeople(fnames: NonEmptyList[String]) = {
+  implicit val fnamesParam = Param.many(fnames)
+  sql"""
+    select person_id, fname, lname, dob
+    from person
+    where fname in (${fnames : fnames.type})
+  """.query[Person]
+}
+
+/**
+ * Given a person, find all their events.
+ */
+def findEventsForPerson(person: Person) = sql"""
+  select event_id, person_id, name, city, state, country, has_expense
+  from event
+  where person_id = ${person.id}
+""".query[Event]
+
+/**
+ * Given an event, find all its expenses.
+ * Illustrates one of the methods for handling composite data types.
+ * The implicit value enables mapping to/from the `Expense` case class
+ * that uses `Money` and a type (with type alias `ExpenseRow`) that
+ * matches the `expense` table definition.
+ */
+def findExpensesForEvent(event: Event) = {
+
+  type ExpenseRow = (Long, Long, Option[String], Option[Int], Option[String])
+
+  implicit val ExpenseComposite: Composite[Expense] = Composite[ExpenseRow].xmap(
+    (r: ExpenseRow) => Expense(
+      r._1, // id
+      r._2, // eventId
+      r._3, // payorName
+      if (r._4.isEmpty) None else Some(Money(r._4.get, r._5)) // amount
+    ),
+    (e: Expense) => (e.id, e.eventId, e.payorName, e.amount.map(_.amount), e.amount.flatMap(_.currency))
+  )
+
+  sql"""
+    select expense_id, event_id, payor_name, expense_amount, expense_amt_curr
+    from expense
+    where event_id = ${event.id}
+  """.query[Expense]
+}
+
